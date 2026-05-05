@@ -37,6 +37,14 @@ jobs:
       - name: Install toolchain + cmake
         run: |
           sudo apt-get update
+          if [[ "${{ matrix.compiler }}" == clang-16 ]]; then
+            # clang-16 not in Ubuntu 22.04 default repos — add LLVM apt repo
+            wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+              | sudo gpg --dearmor -o /usr/share/keyrings/llvm.gpg
+            echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-16 main" \
+              | sudo tee /etc/apt/sources.list.d/llvm.list
+            sudo apt-get update
+          fi
           sudo apt-get install -y --no-install-recommends \
             cmake ninja-build \
             ${{ matrix.cc }} ${{ matrix.cxx }} \
@@ -84,6 +92,14 @@ jobs:
       - name: Install toolchain + cmake
         run: |
           sudo apt-get update
+          if [[ "${{ matrix.compiler }}" == clang-16 ]]; then
+            # clang-16 not in Ubuntu 22.04 default repos — add LLVM apt repo
+            wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+              | sudo gpg --dearmor -o /usr/share/keyrings/llvm.gpg
+            echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-16 main" \
+              | sudo tee /etc/apt/sources.list.d/llvm.list
+            sudo apt-get update
+          fi
           sudo apt-get install -y --no-install-recommends \
             cmake ninja-build \
             ${{ matrix.cc }} ${{ matrix.cxx }} \

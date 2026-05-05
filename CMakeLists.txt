@@ -224,6 +224,11 @@ if(BIST_ENABLE_QUICKFIX)
       CXX_EXTENSIONS ON)
     target_compile_options(quickfix PRIVATE
       -std=gnu++14
+      # GCC 13+ tightened ADL — QuickFIX 1.15.1 SharedArray.h calls memset
+      # without explicit <cstring>. Force-include to keep the stale source
+      # building. Same for <ctime> (asctime / mktime in BoolField.h etc.).
+      -include cstring
+      -include ctime
       -Wno-deprecated-declarations
       -Wno-deprecated-dynamic-exception-spec
       -Wno-shadow

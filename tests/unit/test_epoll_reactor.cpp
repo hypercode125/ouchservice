@@ -29,14 +29,14 @@ TEST(EpollReactor, AddRemoveAndDispatch) {
   // No event yet: run_for returns 0 within budget.
   auto rr = r.run_for(std::chrono::milliseconds(20));
   ASSERT_TRUE(rr);
-  EXPECT_EQ(*rr, 0u);
+  EXPECT_EQ(rr.value(), 0u);
   EXPECT_FALSE(fired);
 
   // Write into the peer; the watched fd becomes readable.
   ::write(sv[1], "x", 1);
   rr = r.run_for(std::chrono::milliseconds(50));
   ASSERT_TRUE(rr);
-  EXPECT_GE(*rr, 1u);
+  EXPECT_GE(rr.value(), 1u);
   EXPECT_TRUE(fired);
 
   ASSERT_TRUE(r.remove(sv[0]));
@@ -50,7 +50,7 @@ TEST(EpollReactor, IdleSleepWhenEmpty) {
   auto rr = r.run_for(std::chrono::milliseconds(20));
   const auto elapsed = std::chrono::steady_clock::now() - t0;
   ASSERT_TRUE(rr);
-  EXPECT_EQ(*rr, 0u);
+  EXPECT_EQ(rr.value(), 0u);
   EXPECT_GE(std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count(),
             15);
 }

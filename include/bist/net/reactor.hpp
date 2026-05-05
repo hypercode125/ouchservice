@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <thread>
 #include <vector>
 
 #include <poll.h>
@@ -89,7 +90,7 @@ class PollReactor final : public IReactor {
   Result<std::size_t> run_for(std::chrono::milliseconds max_wait) override {
     if (pollfds_.empty()) {
       // Nothing to wait for — yield instead of busy-looping.
-      std::this_thread_sleep_for_(max_wait);
+      std::this_thread::sleep_for(max_wait);
       return std::size_t{0};
     }
     const int timeout_ms =
