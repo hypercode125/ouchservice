@@ -1,0 +1,96 @@
+# =====================================================================
+# Build artifacts
+# =====================================================================
+build/
+build-*/
+cmake-build-*/
+out/
+dist/
+
+# =====================================================================
+# Compiler / object / IDE
+# =====================================================================
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dSYM/
+.cache/
+.vscode/
+.idea/
+.clangd/
+compile_commands.json
+*.swp
+*.tmp
+*.bak
+.DS_Store
+
+# =====================================================================
+# AI/agent tool state (Claude Code, Aider, Cursor, Continue, etc.)
+# =====================================================================
+.claude/
+.cursor/
+.continue/
+.aider*
+.serena/
+.cline/
+.codeium/
+.copilot/
+
+# =====================================================================
+# Runtime persistence (created at runtime, never commit)
+# =====================================================================
+state/
+audit/
+log/
+*.log
+*.session.seqnums
+session_*.dat
+*.txt
+/docs
+./ouchpdfs
+
+
+# =====================================================================
+# All markdown untracked (files stay on disk)
+# =====================================================================
+*.md
+
+# =====================================================================
+# BIST PDF / txt source archives (tracked PDFs stay tracked; rule
+# blocks NEW additions and keeps generated text extracts out)
+# =====================================================================
+ouchpdfs/
+ouchpdfs/pdf/
+ouchpdfs/txt/
+*.pdf
+*.txt
+# allow project source-of-truth text files explicitly:
+!CMakeLists.txt
+!**/CMakeLists.txt
+
+# =====================================================================
+# Secrets / local config overrides (NEVER commit credentials)
+# =====================================================================
+config/*.local.toml
+*.local.toml
+*.pem
+*.key
+*.crt
+.env
+.env.*
+secrets/
+credentials/
+
+# =====================================================================
+# OS / archive cruft
+# =====================================================================
+Thumbs.db
+desktop.ini
+.AppleDouble
+.LSOverride
+*.zip
+*.tar
+*.tar.gz
+*.tgz

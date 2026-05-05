@@ -1,0 +1,109 @@
+# config/bist_prod_like.toml
+#
+# BIST Prod-like üye test ortamı (anchor IP 10.57.3.146).
+# Source: Üye Test Ortamları Bilgilendirme Dokümanı, 24.03.2026.
+#   - Canlı sistem ile aynı yazılım sürümü
+#   - Hafta sonu KAPALI
+#   - Cert dry-run ortamı (cert günü öncesi 2 ardışık temiz koşum burada)
+#
+# Erişim: bistechsupport_autoticket@borsaistanbul.com → VPN + hesap
+# Üye self-service portal: https://connectint2.borsaistanbul.com/
+#
+# Public endpoint geometry only. Real credentials live in:
+#   config/bist_prod_like.local.toml  (gitignored)
+
+[environment]
+name        = "prod_like"
+description = "BIST Prod-like üye test ortamı (canlı sürüm aynası, hafta sonu kapalı)"
+weekend     = false
+
+[ouch]
+# OUCH IP doc Tablo 1.3'ten (anchor 10.57.3.146 → OUCH satırı):
+#   COLO  : 194.0.142.76
+#   UEA   : 10.57.3.144
+#
+# OUCH portu doc'ta listelenmemiş — BIST üye-spesifik provision eder.
+# Doğru port BIST destek talebi sonucunda gelir.
+host_primary    = "194.0.142.76"
+host_secondary  = "194.0.142.76"
+ports           = []                          # populated from .local.toml
+heartbeat_ms    = 800
+username        = ""                          # populated from .local.toml
+password        = ""                          # populated from .local.toml
+session         = ""                          # blank = "any session"
+sequence        = 0                           # 0 = "from current"
+cod_reconnect_deadline_ms = 30000             # < BIST CoD 55-62s window
+
+[ouch.uea]                                    # Uzak Erişim Ağı (VPN)
+host  = "10.57.3.144"
+ports = []                                    # populated from .local.toml
+
+[fix]
+# FIX OE/RD doc Tablo 1.3:
+#   Pre-Prod COLO  : 194.0.142.78
+#   Pre-Prod UEA   : 10.57.3.146
+host_primary    = "10.57.3.146"
+host_colo       = "194.0.142.78"
+oe_port         = 0                           # member-specific, BIST verir
+rd_port         = 0
+dc_port         = 0                           # FIX DC ayrı IP: 10.57.3.145 / 194.0.142.77
+sender_comp_id  = ""
+target_comp_id  = ""
+data_dictionary = "include/bist/fix/data_dict/BIST_FIX50SP2.xml"
+heartbeat_secs  = 30
+session_storage = "state/fix"
+
+[fix.dc]
+host_primary    = "10.57.3.145"               # FIX Drop Copy ayrı host
+host_colo       = "194.0.142.77"
+
+[fix.password]
+current = ""
+next    = ""
+
+[itch]
+# ITCH/GLIMPSE/REWINDER (Phase 3 — şu an WIRE EDİLMEDİ, referans amaçlı).
+# Doc Tablo 1.3 — Pay Piyasası (anchor 10.57.3.146):
+itchmold_multicast = "233.113.216.144"
+itchmold_ports     = [21001, 21002, 21003, 21004]   # P1..P4
+itchsoup_uea_host  = "10.57.3.144"
+itchsoup_uea_ports = [21501, 21502, 21503, 21504]
+itchsoup_colo_host = "194.0.142.76"
+itchsoup_colo_ports= [21501, 21502, 21503, 21504]
+itchrw_host        = "194.0.142.76"           # REWINDER unicast retrans
+itchrw_ports       = [24001, 24002, 24003, 24004]
+glimpse_uea_host   = "10.57.3.144"
+glimpse_uea_ports  = [21802, 21804, 21806, 21808]
+glimpse_colo_host  = "194.0.142.76"
+glimpse_colo_ports = [21801, 21803, 21805, 21807]
+
+[ptrm]
+gui_uea = "http://10.57.3.144:8082/grx/"
+api     = ""                                  # talep üzerine BIST verir
+
+[throttler]
+orders_per_sec = 100                          # BIST cert default
+
+[risk]
+max_qty_per_order      = 10_000_000
+max_open_orders        = 50_000
+allowed_price_min_tl   = 0.001
+allowed_price_max_tl   = 1_000_000
+
+[runner]
+default_timeout_ms = 5_000
+abort_on_failure   = true
+
+[logging]
+level     = "info"
+directory = "log/"
+audit_dir = "audit/"
+rotate_at_size_mb = 256
+keep_files        = 30
+
+[reactor]
+hot_cpu_pin       = -1                        # set physical core id in colo
+busy_poll         = false
+tcp_nodelay       = true
+recv_buf_bytes    = 1_048_576
+send_buf_bytes    = 1_048_576

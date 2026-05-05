@@ -1,0 +1,61 @@
+# scenarios/fix_rd_temel.yaml
+#
+# FIX Reference Data Sertifikasyon Programı — Temel Seviye.
+# Source: Pay Piyasası FIX Sertifikasyon Programı – Referans Data Aşaması
+#         Temel Seviye, Aralık 2023, Sürüm 1.2.
+#
+# Cert flow:
+#   1. Logon (SeqNum=1, password=LLL) → "Active" (SessionStatus=0)
+#   2. Heartbeat exchange (default 30s; cert observes one cycle)
+#   3. ApplicationMessageRequest (BW) → ApplicationMessageRequestAck (BX)
+#      "Request successfully processed", followed by:
+#        Security Definition (d) per instrument
+#        Market Definition (BU)
+#        Trading Session List (BJ)
+#        Security Status (f)
+#        Price Reference (BL)  -- BIST extension
+#   4. Duplicate ApplicationMessageRequest within the same Logon →
+#      ApplicationMessageRequestAck (BX) reject "Duplicate Application ID"
+#
+# Skipped under --mock until phase 2.2 lands the FIX Pimpl facade. Once
+# the facade ships, the FIX runner action set (`fix_logon`, `fix_amr`,
+# `fix_logout`) drives this end-to-end against a QuickFIX Acceptor mock
+# spun up in-process the same way OuchMockGateway is spun today.
+
+name: fix_rd_temel
+description: |
+  FIX 5.0 SP2 Reference Data — Temel Seviye: Logon, Heartbeat, Application
+  Message Request subscription, duplicate AMR reject.
+mock_skip: false      # phase 2.3: runner + acceptor mock now drive the RD flow
+preconditions:
+  protocol: fix_rd
+  market: pay_piyasasi
+
+steps:
+  - id: 1
+    action: fix_logon
+    args: { sequence_reset: false, password: LLL }
+    expect: { msg: fix_logon_response, fields: { session_status: 0 } }
+
+  - id: 2
+    action: wait_heartbeat
+    args: { from: server, count: 1, timeout_ms: 32000 }
+    expect: server_heartbeat
+
+  - id: 3
+    action: fix_amr_subscribe
+    args: { appl_req_id: AMR-001 }
+    expect:
+      msg: fix_amr_ack
+      fields: { detail: "Request successfully processed" }
+
+  - id: 4
+    action: fix_amr_subscribe
+    args: { appl_req_id: AMR-002 }
+    expect:
+      msg: fix_amr_ack
+      fields: { detail: "Duplicate Application ID" }
+
+  - id: 5
+    action: fix_logout
+    expect: fix_logout_complete

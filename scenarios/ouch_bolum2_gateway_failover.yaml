@@ -1,0 +1,63 @@
+# scenarios/ouch_bolum2_gateway_failover.yaml
+#
+# OUCH Sertifikasyon Programı — Bölüm 2 Birincil/Yedek Gateway Geçişi.
+# Source: Pay Piyasası OUCH Sertifikasyon Programı v1.7 (Aug 2024).
+#
+# Cert directive:
+#   1. Birincil gateway bağlantısı sonlandırılır
+#   2. Yedek gateway IP/Port'a Login Request gönderilir
+#      (Sequence numarası sıfırlanmaz; son alınan ile devam edilir)
+#   3. Logon Accepted alınır
+#   4. Aşağıdaki probe emirleri Yedek Gateway üzerinden girilir, Order
+#      Accepted alınır:
+#        ARCLK.E ALIŞ Fiyat: 5.000 20 LOT (Partition1) [token=180]
+#        GEREL.E ALIŞ Fiyat: 6.060 20 LOT (Partition2) [token=190]
+#        OYAKC.E ALIŞ Fiyat: 5.000 10 LOT (Partition3) [token=200]
+#        TCELL.E ALIŞ Fiyat: 7.500 10 LOT (Partition4) [token=210]
+#
+# Live-only: the embedded mock gateway runs on a single loopback port and
+# cannot model two distinct gateway endpoints. The runner implements
+# `switch_gateway` via `LiveTransportControl::switch_to_secondary()`, which
+# tears down the current socket, dials [ouch].host_secondary on the same
+# partition port, and re-runs the SoupBinTCP login with
+# requested_sequence = current next_inbound_seq (per cert "Sequence numarası
+# sıfırlanmaz" directive).
+
+name: ouch_bolum2_gateway_failover
+description: |
+  Birincil OUCH gateway bağlantısı sonlandırılır, yedek gateway'e sequence
+  sıfırlanmadan login → Logon Accepted → 4 farklı partition'a probe order.
+mock_skip: false       # MockTransportControl now drives a secondary mock instance for failover
+preconditions:
+  protocol: ouch
+  market: pay_piyasasi
+
+steps:
+  - id: 1
+    action: ouch_login
+    expect: login_accepted
+
+  - id: 2
+    action: switch_gateway
+    args: { tag: secondary }
+    expect: login_accepted          # SoupBinTCP login on the secondary
+
+  - id: 3
+    action: place
+    args: { symbol: ARCLK.E, side: BUY, qty: 20, price: 5.000, token: 180 }
+    expect: order_accepted
+
+  - id: 4
+    action: place
+    args: { symbol: GEREL.E, side: BUY, qty: 20, price: 6.060, token: 190 }
+    expect: order_accepted
+
+  - id: 5
+    action: place
+    args: { symbol: OYAKC.E, side: BUY, qty: 10, price: 5.000, token: 200 }
+    expect: order_accepted
+
+  - id: 6
+    action: place
+    args: { symbol: TCELL.E, side: BUY, qty: 10, price: 7.500, token: 210 }
+    expect: order_accepted

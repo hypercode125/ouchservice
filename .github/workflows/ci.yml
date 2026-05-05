@@ -1,0 +1,148 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  build-test:
+    name: ${{ matrix.os }} · ${{ matrix.compiler }} · ${{ matrix.build_type }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04]
+        compiler: [gcc-12, clang-16]
+        build_type: [Release, Debug]
+        include:
+          - compiler: gcc-12
+            cc: gcc-12
+            cxx: g++-12
+          - compiler: clang-16
+            cc: clang-16
+            cxx: clang++-16
+          - build_type: Debug
+            sanitizers: ON
+          - build_type: Release
+            sanitizers: OFF
+    env:
+      CC:  ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain + cmake
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build \
+            ${{ matrix.cc }} ${{ matrix.cxx }} \
+            libssl-dev pkg-config
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DBIST_ENABLE_QUICKFIX=OFF \
+            -DBIST_ENABLE_SANITIZERS=${{ matrix.sanitizers }}
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure -j
+
+      - name: Lint scenarios
+        run: ./build/apps/tools/scenario_lint scenarios
+
+      - name: Cert-replay against mock gateway
+        run: ./build/apps/bist_colo --mock --replay scenarios/
+
+  build-fix:
+    name: ${{ matrix.os }} · ${{ matrix.compiler }} · FIX-enabled
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04]
+        compiler: [gcc-12, clang-16]
+        include:
+          - compiler: gcc-12
+            cc: gcc-12
+            cxx: g++-12
+          - compiler: clang-16
+            cc: clang-16
+            cxx: clang++-16
+    env:
+      CC:  ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain + cmake
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build \
+            ${{ matrix.cc }} ${{ matrix.cxx }} \
+            libssl-dev pkg-config
+      - name: Configure FIX-enabled Release
+        run: |
+          cmake -S . -B build-fix -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBIST_BUILD_FIX=ON \
+            -DBIST_ENABLE_QUICKFIX=ON
+      - name: Build (FIX)
+        run: cmake --build build-fix -j
+      - name: Unit tests (FIX)
+        run: ctest --test-dir build-fix --output-on-failure -j
+      - name: Lint scenarios (FIX)
+        run: ./build-fix/apps/tools/scenario_lint scenarios
+      - name: Cert-replay (FIX, mock)
+        run: ./build-fix/apps/bist_colo --mock --replay scenarios/
+
+  deploy-package:
+    name: ubuntu-22.04 · build deploy tarball
+    runs-on: ubuntu-22.04
+    needs: [build-test, build-fix]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build gcc-12 g++-12 libssl-dev pkg-config
+      - name: Build deploy archive
+        env:
+          CC: gcc-12
+          CXX: g++-12
+        run: |
+          chmod +x scripts/build_deploy.sh
+          ./scripts/build_deploy.sh dist
+      - name: Upload tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: bist-colo-deploy-${{ github.sha }}
+          path: dist/bist-colo-*.tar.gz
+          retention-days: 14
+
+  format-check:
+    name: clang-format
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+      - name: Check formatting
+        run: |
+          # Phase 1: not enforced — collect diff, do not fail.
+          # Phase 2: switch to `clang-format --dry-run --Werror` to gate
+          #          the merge.
+          find include src apps tests -name '*.hpp' -o -name '*.cpp' \
+            | xargs clang-format --output-replacements-xml \
+            | grep -c "<replacement " \
+            || true

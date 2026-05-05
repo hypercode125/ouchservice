@@ -1,0 +1,45 @@
+# scenarios/ouch_bolum2_throttling.yaml
+#
+# OUCH Sertifikasyon Programı — Bölüm 2 Throttling Testi.
+# Source: Pay Piyasası OUCH Sertifikasyon Programı v1.7 (Aug 2024).
+#
+# Cert directive: 1000 emir 10 saniyede gönder; sistemde tanımlı 100 emir/sn
+# limitine bağlı kalınmalıdır. ALBRK.E, ECILC.E, MAVI.E, TBORG.E sıralarında
+# çapraz alış/satış emirleri.
+#
+# Runner pacing comes from `BurstPlaceArgs` + `OuchClient`'s built-in
+# `domain::Throttler` (token bucket, refill = `[throttler].orders_per_sec`).
+# The mock gateway acks every order on the same hot thread, so wall time
+# is dominated by the bucket refill — `count / rate_per_sec` ≈ 10 s.
+
+name: ouch_bolum2_throttling
+description: |
+  1000 alış/satış emrini 100 emir/sn limitine bağlı kalarak göndermeli,
+  her biri Order Accepted yanıtı almalı.
+preconditions:
+  protocol: ouch
+  market: pay_piyasasi
+
+steps:
+  - id: 1
+    action: ouch_login
+    expect: login_accepted
+
+  - id: 2
+    action: burst_place
+    args:
+      count: 1000
+      rate_per_sec: 100
+      pattern:
+        - { symbol: ALBRK.E, side: BUY,  qty: 10, price: 6.000, token_prefix: 10000 }
+        - { symbol: ALBRK.E, side: SELL, qty: 10, price: 6.100, token_prefix: 20000 }
+        - { symbol: ECILC.E, side: BUY,  qty: 10, price: 6.000, token_prefix: 30000 }
+        - { symbol: ECILC.E, side: SELL, qty: 10, price: 6.100, token_prefix: 40000 }
+        - { symbol: MAVI.E,  side: BUY,  qty: 10, price: 6.000, token_prefix: 50000 }
+        - { symbol: MAVI.E,  side: SELL, qty: 10, price: 6.100, token_prefix: 60000 }
+        - { symbol: TBORG.E, side: BUY,  qty: 10, price: 6.000, token_prefix: 70000 }
+        - { symbol: TBORG.E, side: SELL, qty: 10, price: 6.100, token_prefix: 80000 }
+    expect:
+      msg: order_accepted
+      occurrences: 1000
+      timeout_ms: 15000

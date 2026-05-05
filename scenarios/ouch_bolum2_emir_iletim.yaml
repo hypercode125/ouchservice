@@ -1,0 +1,97 @@
+# scenarios/ouch_bolum2_emir_iletim.yaml
+#
+# OUCH Sertifikasyon Programı — Bölüm 2: Emir İletim ve Fonksiyonları
+# (Açılış Seansı). Source: Pay Piyasası OUCH Sertifikasyon Programı v1.7.
+#
+# Test ADEL.E (OrderBookID=70676, baz fiyat 6.000 TL).
+
+name: ouch_bolum2_emir_iletim_acilis
+description: |
+  ADEL.E açılış seansı: 5 emir gir, token ile iptal, OrderID ile iptal,
+  replace, hata kodları (-420131 fiyat dışı, -800002 token tekrar).
+preconditions:
+  protocol: ouch
+  market: pay_piyasasi
+
+steps:
+  - id: 1
+    action: ouch_login
+    expect: login_accepted
+
+  # ----- 5 alış/satış emri -----
+  - id: 2
+    action: place
+    args: { symbol: ADEL.E, side: BUY, qty: 200, price: 6.200, tif: DAY,
+            category: CLIENT, token: 10 }
+    expect:
+      msg: order_accepted
+      fields: { token: 10, side: B, quantity: 200, price: 6200 }
+
+  - id: 3
+    action: place
+    args: { symbol: ADEL.E, side: BUY, qty: 90, price: 6.090, token: 20 }
+    expect: order_accepted
+
+  - id: 4
+    action: place
+    args: { symbol: ADEL.E, side: SELL, qty: 80, price: 6.080, token: 30 }
+    expect: order_accepted
+
+  - id: 5
+    action: place
+    args: { symbol: ADEL.E, side: BUY, qty: 100, price: 6.190, token: 40 }
+    expect: order_accepted
+
+  - id: 6
+    action: place
+    args: { symbol: ADEL.E, side: BUY, qty: 50, price: 6.180, token: 50 }
+    expect: order_accepted
+
+  # ----- iptal token=20 (Cancel by Token) -----
+  - id: 7
+    action: cancel_by_token
+    args: { token: 20 }
+    expect:
+      msg: order_canceled
+      fields: { token: 20, reason: 1 }       # 1 = canceled by user
+
+  # ----- iptal token=40 (Cancel by Order ID) -----
+  - id: 8
+    action: cancel_by_order_id
+    args:  { token_ref: 40 }                 # runner resolves OrderID via order_book
+    expect: order_canceled
+
+  # ----- replace token=30 (qty 80→79, price 6.080→6.070) -----
+  - id: 9
+    action: replace
+    args: { existing_token: 30, new_token: 60, qty: 79, price: 6.070 }
+    expect:
+      msg: order_replaced
+      fields:
+        replacement_token: 60
+        previous_token: 30
+        quantity: 79
+        price: 6070
+        order_state: 1                       # OnBook
+
+  # ----- reject 1: fiyat limit dışı -----
+  - id: 10
+    action: place
+    args: { symbol: ADEL.E, side: BUY, qty: 100, price: 10.000, token: 70 }
+    expect:
+      msg: order_rejected
+      fields: { token: 70, reject_code: -420131 }
+
+  # ----- reject 2: token tekrar -----
+  - id: 11
+    action: place
+    args: { symbol: ADEL.E, side: SELL, qty: 150, price: 6.000, token: 10 }
+    expect:
+      msg: order_rejected
+      fields: { reject_code: -800002 }
+
+  # ----- açılış eşleştirme: cert günü Borsa Operatörü tetikler -----
+  # Mock gateway has no continuous matching engine in phase 1, so the
+  # opening-match assertion below stays as a comment until phase 2:
+  #   action: expect
+  #   args: { msg: order_executed, fields: { token: 10, traded_quantity: 79, trade_price: 6200 } }

@@ -1,0 +1,40 @@
+# config/bist_preprod.local.toml
+#
+# Pre-Prod ortamı için per-host secrets.
+# Kopyala: bist_preprod.local.toml (suffix'siz), gerçek değerleri doldur.
+# `*.local.toml` gitignored. Loader public config'in üstüne bunu merge eder.
+
+[ouch]
+username = "MEMBER_OUCH_ACCOUNT"   # 6-char left-justified BIST hesabı
+password = "MEMBER_OUCH_PASSWORD"  # BIST politikasına göre rotate
+ports    = [25502]                 # BIST üye-spesifik provision verir
+
+[ouch.uea]
+ports = [25502]                    # UEA üzerinden de aynı port
+
+[fix]
+sender_comp_id = "MEMBER_SENDER"
+target_comp_id = "BIST_TARGET"
+username       = "MEMBER_FIX_USER" # tag 553
+oe_port        = 0                 # BIST üye-spesifik
+rd_port        = 0
+dc_port        = 0
+
+[fix.oe]
+sender_comp_id = "MEMBER_OE"
+target_comp_id = "BIST_OE"
+username       = "MEMBER_FIX_USER"
+
+[fix.rd]
+sender_comp_id = "MEMBER_RD"
+target_comp_id = "BIST_RD"
+username       = "MEMBER_FIX_USER"
+
+[fix.dc]
+sender_comp_id = "MEMBER_DC"
+target_comp_id = "BIST_DC"
+username       = "MEMBER_FIX_USER"
+
+[fix.password]
+current = "MEMBER_FIX_CURRENT_PW"
+next    = "MEMBER_FIX_NEXT_PW"

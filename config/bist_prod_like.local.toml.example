@@ -1,0 +1,49 @@
+# config/bist_prod_like.local.toml
+#
+# Per-host secrets. Copy this file to `bist_prod_like.local.toml` (without the
+# .example suffix), fill in the real values, and never commit it.
+#
+# `*.local.toml` is gitignored. The loader merges this on top of the public
+# `bist_prod_like.toml`, replacing only non-empty keys.
+
+[ouch]
+username = "MEMBER_OUCH_ACCOUNT"   # 6-char left-justified BIST account
+password = "MEMBER_OUCH_PASSWORD"  # rotates per BIST policy
+ports    = [25502]                 # BIST üye-spesifik provision verir
+# CoD reconnect deadline: must be < BIST ME inactivation window (55-62 s).
+# 30 000 ms is the cert-day default; tighten only after dry-run validation.
+cod_reconnect_deadline_ms = 30000
+
+[ouch.uea]
+ports = [25502]                    # UEA üzerinden de aynı port
+
+[fix]
+host_primary   = "fix.bist.example"  # BIST member-specific FIX endpoint
+oe_port        = 0                    # BIST member-specific FIX OE port
+rd_port        = 0                    # BIST member-specific FIX RD port
+dc_port        = 0                    # BIST member-specific Drop Copy port
+# Base SenderCompID/TargetCompID. Per-channel `[fix.oe]` etc. overrides this.
+# Without per-channel blocks the loader appends "_OE", "_RD", "_DC" to the
+# base sender + target.
+sender_comp_id = "MEMBER_SENDER"
+target_comp_id = "BIST_TARGET"
+username       = "MEMBER_FIX_USER"   # tag 553
+
+[fix.oe]
+sender_comp_id = "MEMBER_OE"
+target_comp_id = "BIST_OE"
+username       = "MEMBER_FIX_USER"   # tag 553 — OE-specific override
+
+[fix.rd]
+sender_comp_id = "MEMBER_RD"
+target_comp_id = "BIST_RD"
+username       = "MEMBER_FIX_USER"
+
+[fix.dc]
+sender_comp_id = "MEMBER_DC"
+target_comp_id = "BIST_DC"
+username       = "MEMBER_FIX_USER"
+
+[fix.password]
+current = "MEMBER_FIX_CURRENT_PW"
+next    = "MEMBER_FIX_NEXT_PW"     # sent on first logon when SessionStatus=8

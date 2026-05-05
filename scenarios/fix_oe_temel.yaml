@@ -1,0 +1,159 @@
+# scenarios/fix_oe_temel.yaml
+#
+# FIX Order Entry Sertifikasyon Programı — Temel Seviye.
+# Source: Pay Piyasası FIX Sertifikasyon Programı – Emir İletim Aşaması
+#         Temel Seviye, Kasım 2025, Sürüm 1.7.
+#
+# 26 cert steps cover:
+#   - Logon with password rotation (SessionStatus=8 → 554/925 → 1409=1)
+#   - Sequence reset (ResetSeqNumFlag=Y, SeqNum=1)
+#   - ResendRequest handling (GapFillFlag=Y for session, PossDupFlag=Y +
+#     OrigSendingTime for application messages)
+#   - Order types: Limit/Market/MtL/IoC/FoK/Imbalance/Iceberg/Midpoint/AOF/
+#     Açığa Satış
+#   - Replace LeavesQty math (151 = new total - executed)
+#   - Reject codes returned in ExecutionReport(8) Text(58) field
+#   - Birincil/Yedek Gateway geçişi for OE and Drop Copy
+#   - Day-end inactive cancel (Order State Inactive)
+#
+# Skipped under --mock until phase 2.2 ships the FIX Pimpl facade and the
+# QuickFIX Acceptor mock that performs the rotation+resend cert flow.
+
+name: fix_oe_temel
+description: |
+  FIX 5.0 SP2 Order Entry — Temel Seviye: Logon w/ password change,
+  SequenceReset, ResendRequest, 26 emir tipi senaryosu, Gateway failover,
+  Drop Copy resend.
+mock_skip: false       # phase 2.3: runner + acceptor mock now drive the OE flow
+preconditions:
+  protocol: fix_oe
+  market: pay_piyasasi
+
+steps:
+  # ------- Logon with password rotation (cert step 1) -------
+  - id: 1
+    action: fix_logon
+    args: { sequence_reset: false, password: LLL, new_password: MMM }
+    expect: { msg: fix_logon_response, fields: { session_status: 1 } }   # 1 = Session Password Changed
+
+  - id: 2
+    action: fix_logout
+    expect: fix_logout_complete
+
+  - id: 3
+    action: fix_logon
+    args: { sequence_reset: true, password: MMM }
+    expect: { msg: fix_logon_response, fields: { session_status: 0 } }
+
+  # ------- Resend Request (cert step 4-5: Logout → match → Logon → Resend) -------
+  - id: 4
+    action: place
+    args: { symbol: AKBNK.E, side: BUY, qty: 5,  price: 5.000, token: 1 }
+    expect: fix_execution_report
+  - id: 5
+    action: place
+    args: { symbol: GARAN.E, side: BUY, qty: 10, price: 5.010, token: 2 }
+    expect: fix_execution_report
+  - id: 6
+    action: fix_logout
+    expect: fix_logout_complete
+  - id: 7
+    action: trigger_match            # cert: peer fills the resting orders while we're logged out
+    when: { profile: live }
+  - id: 8
+    action: fix_logon
+    args: { sequence_reset: false }
+    expect: fix_logon_response
+  - id: 9
+    action: expect
+    args: { msg: fix_execution_report, occurrences: 2 }   # Resend yields the 2 execs
+
+  # ------- Açılış emir akışı: ACSEL.E full sequence (cert step 10) -------
+  - id: 10
+    action: place
+    args: { symbol: ACSEL.E, side: BUY,  qty: 200, price: 6.200, token: 10 }
+    expect: fix_execution_report
+  - id: 11
+    action: place
+    args: { symbol: ACSEL.E, side: BUY,  qty: 90,  price: 6.090, token: 20 }
+    expect: fix_execution_report
+  - id: 12
+    action: place
+    args: { symbol: ACSEL.E, side: BUY,  qty: 50,  price: 6.050, tif: IOC, token: 60 }
+    expect: fix_execution_report
+  - id: 13
+    action: place
+    args: { symbol: ACSEL.E, side: SELL, qty: 650, price: 6.300, category: FUND, afk: XRM, token: 80 }
+    expect: fix_execution_report
+
+  - id: 14
+    action: cancel_by_token
+    args: { token: 20, new_token: 90 }
+    expect: fix_execution_report
+
+  - id: 15
+    # Cert program calls for an OrderCancelReplaceRequest against the
+    # SELL leg seeded above (token 80). Original program text references
+    # token 30 (a typo carried over from the OUCH variant); we redirect
+    # to token 80 so the cancel-replace targets a real resting order.
+    action: replace
+    args: { existing_token: 80, new_token: 100, qty: 600, price: 6.310 }
+    expect: fix_execution_report
+
+  # ------- AEFES.E market order types (cert step 5) -------
+  - id: 16
+    action: place
+    args: { symbol: AEFES.E, side: BUY, qty: 250, price: 0, ord_type: MARKET, tif: IOC, token: 130 }
+    expect: fix_execution_report
+  - id: 17
+    action: place
+    args: { symbol: AEFES.E, side: BUY, qty: 300, price: 0, ord_type: MARKET, tif: IOC, category: HOUSE, token: 140 }
+    expect: fix_execution_report
+
+  # ------- AKCNS.E Market-to-Limit (cert step 8) -------
+  - id: 18
+    action: place
+    args: { symbol: AKCNS.E, side: BUY, qty: 250, price: 0, ord_type: MTL,    tif: DAY, token: 220 }
+    expect: fix_execution_report
+  - id: 19
+    action: place
+    args: { symbol: AKCNS.E, side: BUY, qty: 300, price: 0, ord_type: MTL,    tif: IOC, category: HOUSE, token: 230 }
+    expect: fix_execution_report
+
+  # ------- ADEL.E Imbalance (cert step 9) -------
+  - id: 20
+    action: place
+    args: { symbol: ADEL.E,  side: BUY, qty: 250, price: 0, ord_type: IMBALANCE, tif: IOC, token: 260 }
+    expect: fix_execution_report
+
+  # ------- ARCLK.E iceberg (cert step 22) -------
+  - id: 21
+    action: place
+    args: { symbol: ARCLK.E, side: BUY, qty: 500, display_qty: 100, price: 5.200, token: 450 }
+    expect: fix_execution_report
+
+  # ------- ASELS.E midpoint (cert step 23) -------
+  - id: 22
+    action: place
+    args: { symbol: ASELS.E, side: BUY,  qty: 45000, price: 5.210, ord_type: MIDPOINT_LIMIT, token: 500 }
+    expect: fix_execution_report
+  - id: 23
+    action: place
+    args: { symbol: ASELS.E, side: BUY,  qty: 70000, price: 0,     ord_type: MIDPOINT_MARKET, tif: IOC, token: 520 }
+    expect: fix_execution_report
+
+  # ------- AKBNK.AOF negative price (cert step 24) -------
+  - id: 24
+    action: place
+    args: { symbol: AKBNK.AOF, side: BUY,  qty: 100000, price: -0.010, token: 540 }
+    expect: fix_execution_report
+
+  # ------- BAKAB.E açığa satış (cert step 26) -------
+  - id: 25
+    action: place
+    args: { symbol: BAKAB.E, side: SHORT, qty: 50, price: 5.010, token: 680 }
+    expect: { msg: fix_execution_report, fields: { trd_type: short_sell } }
+
+  - id: 26
+    action: fix_logout
+    expect: fix_logout_complete

@@ -1,0 +1,62 @@
+[Unit]
+Description=BIST Pay Piyasası co-location OUCH/FIX client (bist_colo)
+Documentation=file:///opt/bist-colo/docs/RUNBOOK.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bistcolo
+Group=bistcolo
+WorkingDirectory=/opt/bist-colo
+EnvironmentFile=-/etc/bist-colo/env
+ExecStartPre=/opt/bist-colo/bin/preflight \
+    --config /etc/bist-colo/bist_prod_like.toml
+ExecStart=/opt/bist-colo/bin/bist_colo \
+    --config /etc/bist-colo/bist_prod_like.toml \
+    --partition ${BIST_PARTITION}
+
+# Graceful shutdown: SIGTERM triggers logout flush + sequence persist.
+KillSignal=SIGTERM
+TimeoutStopSec=30s
+
+# Resident service: restart on any abnormal exit, but never faster than
+# 5 s so we don't burn through reconnect attempts during an outage.
+Restart=on-failure
+RestartSec=5s
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+# Resource limits sized for a single OUCH + FIX OE/RD/DC initiator.
+LimitNOFILE=65536
+LimitMEMLOCK=infinity
+TasksMax=64
+
+# Sandboxing — bist_colo only writes to /var/lib/bist-colo (state),
+# /var/log/bist-colo (audit + log) and reads /etc/bist-colo (config).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/bist-colo /var/log/bist-colo
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+
+# Real-time priority is recommended for the hot reactor thread; uncomment
+# after operator validates RT permissions on the host.
+# CPUSchedulingPolicy=fifo
+# CPUSchedulingPriority=80
+
+# Journal logging: stdout/stderr → journald (audit log file is separate).
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bist-colo
+
+[Install]
+WantedBy=multi-user.target

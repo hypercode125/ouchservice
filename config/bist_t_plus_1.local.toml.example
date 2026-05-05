@@ -1,0 +1,40 @@
+# config/bist_t_plus_1.local.toml
+#
+# T+1 ortamı için per-host secrets.
+# Kopyala: bist_t_plus_1.local.toml (suffix'siz).
+# T+1 hesapları Pre-Prod/Prod-like'tan AYRI — ayrı talep gerekir.
+
+[ouch]
+username = "MEMBER_OUCH_ACCOUNT"
+password = "MEMBER_OUCH_PASSWORD"
+ports    = [25502]
+
+[ouch.uea]
+ports = [25502]
+
+[fix]
+sender_comp_id = "MEMBER_SENDER"
+target_comp_id = "BIST_TARGET"
+username       = "MEMBER_FIX_USER"
+oe_port        = 0
+rd_port        = 0
+dc_port        = 0
+
+[fix.oe]
+sender_comp_id = "MEMBER_OE"
+target_comp_id = "BIST_OE"
+username       = "MEMBER_FIX_USER"
+
+[fix.rd]
+sender_comp_id = "MEMBER_RD"
+target_comp_id = "BIST_RD"
+username       = "MEMBER_FIX_USER"
+
+[fix.dc]
+sender_comp_id = "MEMBER_DC"
+target_comp_id = "BIST_DC"
+username       = "MEMBER_FIX_USER"
+
+[fix.password]
+current = "MEMBER_FIX_CURRENT_PW"
+next    = "MEMBER_FIX_NEXT_PW"

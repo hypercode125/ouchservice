@@ -1,0 +1,87 @@
+# scenarios/ouch_bolum2_surekli.yaml
+#
+# OUCH Sertifikasyon Programı — Bölüm 2: Emir İletim ve Fonksiyonları
+# (Sürekli Müzayede). Source: Pay Piyasası OUCH Sertifikasyon Programı v1.7,
+# Bölüm 2.4 "Sürekli Müzayede".
+#
+# Continuous-auction replace flow on three liquid names: GARAN.E, KAREL.E,
+# VAKKO.E. Each test exercises a different facet of the replace semantics:
+#   - qty-only update (GARAN.E)
+#   - price-only update (KAREL.E)
+#   - both qty+price update (VAKKO.E)
+#
+# OnBook state must be preserved across replaces (OrderState=1). Token
+# changes between request (existing) and reply (replacement).
+
+name: ouch_bolum2_surekli
+description: |
+  Sürekli müzayede replace senaryoları: GARAN qty, KAREL price, VAKKO her iki
+  alan. Her adımda OrderState=1 (OnBook) ve replacement_token doğrulanır.
+preconditions:
+  protocol: ouch
+  market: pay_piyasasi
+
+steps:
+  - id: 1
+    action: ouch_login
+    expect: login_accepted
+
+  # ===== GARAN.E — qty-only replace =====
+  - id: 2
+    action: place
+    args: { symbol: GARAN.E, side: BUY, qty: 500, price: 5.000, token: 200 }
+    expect:
+      msg: order_accepted
+      fields: { token: 200, side: B, quantity: 500, price: 5000, order_state: 1 }
+
+  - id: 3
+    action: replace
+    args: { existing_token: 200, new_token: 201, qty: 750, price: 5.000 }
+    expect:
+      msg: order_replaced
+      fields:
+        replacement_token: 201
+        previous_token: 200
+        quantity: 750
+        price: 5000
+        order_state: 1
+
+  # ===== KAREL.E — price-only replace =====
+  - id: 4
+    action: place
+    args: { symbol: KAREL.E, side: SELL, qty: 200, price: 5.500, token: 210 }
+    expect:
+      msg: order_accepted
+      fields: { token: 210, side: S, quantity: 200, price: 5500, order_state: 1 }
+
+  - id: 5
+    action: replace
+    args: { existing_token: 210, new_token: 211, qty: 200, price: 5.510 }
+    expect:
+      msg: order_replaced
+      fields:
+        replacement_token: 211
+        previous_token: 210
+        quantity: 200
+        price: 5510
+        order_state: 1
+
+  # ===== VAKKO.E — qty + price replace =====
+  - id: 6
+    action: place
+    args: { symbol: VAKKO.E, side: BUY, qty: 300, price: 5.000, token: 220 }
+    expect:
+      msg: order_accepted
+      fields: { token: 220, side: B, quantity: 300, price: 5000, order_state: 1 }
+
+  - id: 7
+    action: replace
+    args: { existing_token: 220, new_token: 221, qty: 250, price: 5.030 }
+    expect:
+      msg: order_replaced
+      fields:
+        replacement_token: 221
+        previous_token: 220
+        quantity: 250
+        price: 5030
+        order_state: 1

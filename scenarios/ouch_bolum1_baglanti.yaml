@@ -1,0 +1,39 @@
+# scenarios/ouch_bolum1_baglanti.yaml
+#
+# OUCH Sertifikasyon Programı — Bölüm 1: Sistem Bağlantı Testleri.
+# Source: Pay Piyasası OUCH Sertifikasyon Programı, Sürüm 1.7 (Aug 2024).
+
+name: ouch_bolum1_baglanti
+description: |
+  Sistem bağlantı, heartbeat, logout, hatalı login retry akışı.
+  Test 1.1 - 1.5: login (pwd=123456), heartbeat 1s, logout, hatalı login
+  (pwd=123 → ReasonCode=A), tekrar login.
+mock_skip: false       # mock gateway now multi-session via MockTransportControl
+preconditions:
+  protocol: ouch
+  market: pay_piyasasi
+
+steps:
+  - id: 1
+    action: ouch_login
+    args: { session: "", sequence: 0, password: "123456" }
+    expect: { msg: login_accepted }
+
+  - id: 2
+    action: wait_heartbeat
+    args: { from: server, count: 1, timeout_ms: 1500 }
+    expect: { msg: server_heartbeat }
+
+  - id: 3
+    action: ouch_logout
+    expect: { msg: socket_closed }
+
+  - id: 4
+    action: ouch_login
+    args: { session: "", sequence: 0, password: "123" }
+    expect: { msg: login_rejected, fields: { reason_code: "A" } }
+
+  - id: 5
+    action: ouch_login
+    args: { session: "", sequence: 0, password: "123456" }
+    expect: { msg: login_accepted }

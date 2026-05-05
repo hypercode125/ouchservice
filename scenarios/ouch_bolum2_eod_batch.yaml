@@ -1,0 +1,71 @@
+# scenarios/ouch_bolum2_eod_batch.yaml
+#
+# OUCH Sertifikasyon Programı — Bölüm 2: Emir İletim ve Fonksiyonları
+# (Gün-Sonu Toplu İptal). Source: Pay Piyasası OUCH Sertifikasyon Programı
+# v1.7, Bölüm 2.6 "EOD batch cancellation".
+#
+# At session end the matching engine inactivates every resting order with
+# a CancelReason=4 (Inactivate). The cert proof is to seed several resting
+# orders in the order book, then assert that each comes back as
+# OrderCanceled with reason=4 (or 10 if BIST replaces it with the
+# CoD-Inactivate code).
+#
+# This scenario is mock_skip until the mock gateway grows EOD batch
+# support; today the Cert auditor observes the live ME inactivation pass.
+
+name: ouch_bolum2_eod_batch
+description: |
+  Resting orders 5 üzeri seed et; gün-sonu batch'te her birinin
+  OrderCanceled.reason=4 (Inactivate) ile geldiği doğrulanır. Mock
+  `inactivate_all` action triggers the gateway to flush all resting
+  orders with reason=4; live mode receives the same batch from the BIST
+  matching engine at session end.
+mock_skip: false
+preconditions:
+  protocol: ouch
+  market: pay_piyasasi
+
+steps:
+  - id: 1
+    action: ouch_login
+    expect: login_accepted
+
+  - id: 2
+    action: place
+    args: { symbol: GARAN.E, side: BUY,  qty: 100, price: 5.000, token: 300 }
+    expect: order_accepted
+
+  - id: 3
+    action: place
+    args: { symbol: GARAN.E, side: SELL, qty: 100, price: 5.500, token: 301 }
+    expect: order_accepted
+
+  - id: 4
+    action: place
+    args: { symbol: AKBNK.E, side: BUY,  qty: 200, price: 4.900, token: 310 }
+    expect: order_accepted
+
+  - id: 5
+    action: place
+    args: { symbol: AKBNK.E, side: SELL, qty: 200, price: 5.100, token: 311 }
+    expect: order_accepted
+
+  - id: 6
+    action: place
+    args: { symbol: VAKKO.E, side: BUY,  qty: 50,  price: 5.020, token: 320 }
+    expect: order_accepted
+
+  # ===== EOD batch trigger =====
+  # Mock: action `inactivate_all` flushes resting orders with reason=4.
+  # Live: omit the inactivate_all step; the BIST matching engine emits the
+  # same batch automatically at session end.
+  - id: 7
+    action: inactivate_all
+
+  - id: 8
+    action: expect
+    expect:
+      msg: order_canceled
+      occurrences: 5
+      timeout_ms: 5000
+      fields: { reason: 4 }
