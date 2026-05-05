@@ -48,14 +48,25 @@ log/
 *.session.seqnums
 session_*.dat
 *.txt
-/docs
-./ouchpdfs
+/ouchpdfs
 
 
 # =====================================================================
-# All markdown untracked (files stay on disk)
+# Markdown — blanket ignore + explicit exceptions for files referenced
+# by scripts/build_deploy.sh (CI fresh checkout needs them present).
 # =====================================================================
 *.md
+docs/*
+!docs/RUNBOOK.md
+!docs/BIST_10_10_READINESS_PLAN.md
+!docs/BIST_ENVIRONMENTS.md
+!docs/KNOWN_LIMITATIONS.md
+!docs/FIX_INTEGRATION.md
+!docs/GAP-REPORT.md
+# Re-track design spec subdir (locked decisions live here)
+!docs/superpowers
+docs/superpowers/*
+!docs/superpowers/specs
 
 # =====================================================================
 # BIST PDF / txt source archives (tracked PDFs stay tracked; rule

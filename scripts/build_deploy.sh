@@ -77,9 +77,18 @@ cp "$ROOT/config/bist_prod_like.local.toml.example" "$STAGE/config/"
 cp "$ROOT/deploy/bist-colo.service" "$STAGE/deploy/"
 cp "$ROOT/deploy/install.sh"        "$STAGE/deploy/"
 chmod 0755 "$STAGE/deploy/install.sh"
-cp "$ROOT/docs/RUNBOOK.md"                  "$STAGE/docs/"
-cp "$ROOT/docs/BIST_10_10_READINESS_PLAN.md" "$STAGE/docs/"
-cp "$ROOT/STATUS.md"                        "$STAGE/docs/"
+# Optional docs — copy if present. CI fresh-checkouts honour the
+# .gitignore-allowed set; an unexpectedly missing file should not abort
+# the package build.
+for doc in docs/RUNBOOK.md docs/BIST_10_10_READINESS_PLAN.md \
+           docs/KNOWN_LIMITATIONS.md docs/BIST_ENVIRONMENTS.md \
+           STATUS.md; do
+  if [[ -f "$ROOT/$doc" ]]; then
+    cp "$ROOT/$doc" "$STAGE/docs/"
+  else
+    echo "  (skip missing $doc)"
+  fi
+done
 
 cat > "$STAGE/VERSION" <<EOF
 package:    $PKG_NAME
