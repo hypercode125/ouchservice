@@ -10,9 +10,18 @@
 // per BISTECH OUCH Protocol Specification (06 February 2025) §3.
 
 #include <array>
-#include <bit>
 #include <cstdint>
-#include <string_view>
+
+// C++17 features (string_view, [[nodiscard]]) are needed by C++20 consumers
+// of this header. The FIX bridge TUs (facade_quickfix.cpp, acceptor_mock.cpp)
+// compile at -std=gnu++14 because QuickFIX 1.15.1 uses std::auto_ptr +
+// dynamic exception specs. Guard so the header parses under both standards.
+#if defined(__cplusplus) && __cplusplus >= 201703L
+#  include <string_view>
+#  define BIST_NODISCARD [[nodiscard]]
+#else
+#  define BIST_NODISCARD
+#endif
 
 namespace bist {
 
@@ -170,25 +179,42 @@ class OrderToken {
 
   OrderToken() noexcept { storage_.fill(' '); }
 
-  // Construct from ASCII; truncates or pads to 14 bytes. Caller is responsible
-  // for token-uniqueness (per OUCH Spec, duplicate tokens reject -800002).
-  explicit OrderToken(std::string_view s) noexcept {
+  // Construct from raw ASCII; truncates or pads to 14 bytes. Caller is
+  // responsible for token-uniqueness (per OUCH Spec, duplicate tokens
+  // reject -800002).
+  OrderToken(const char* data, std::size_t len) noexcept {
     storage_.fill(' ');
-    const std::size_t n = std::min(s.size(), kSize);
-    for (std::size_t i = 0; i < n; ++i) storage_[i] = s[i];
+    const std::size_t n = (len < kSize) ? len : kSize;
+    for (std::size_t i = 0; i < n; ++i) storage_[i] = data[i];
   }
 
-  [[nodiscard]] const Storage& bytes() const noexcept { return storage_; }
-  [[nodiscard]] Storage&       bytes()       noexcept { return storage_; }
+#if defined(__cplusplus) && __cplusplus >= 201703L
+  // string_view convenience overload — only the C++17+ surface.
+  explicit OrderToken(std::string_view s) noexcept
+      : OrderToken(s.data(), s.size()) {}
+#endif
 
-  // Trimmed printable view (without trailing pad spaces).
-  [[nodiscard]] std::string_view view() const noexcept {
+  BIST_NODISCARD const Storage& bytes() const noexcept { return storage_; }
+  BIST_NODISCARD Storage&       bytes()       noexcept { return storage_; }
+
+#if defined(__cplusplus) && __cplusplus >= 201703L
+  // Trimmed printable view (without trailing pad spaces). Only available
+  // under C++17+ where string_view exists.
+  BIST_NODISCARD std::string_view view() const noexcept {
     std::size_t n = kSize;
     while (n > 0 && storage_[n - 1] == ' ') --n;
     return {storage_.data(), n};
   }
+#endif
 
-  friend bool operator==(const OrderToken&, const OrderToken&) = default;
+  // C++14-compatible equality. C++20 would let us write `= default` here,
+  // but the FIX bridge TUs are pinned to gnu++14.
+  friend bool operator==(const OrderToken& a, const OrderToken& b) noexcept {
+    return a.storage_ == b.storage_;
+  }
+  friend bool operator!=(const OrderToken& a, const OrderToken& b) noexcept {
+    return !(a == b);
+  }
 
  private:
   Storage storage_{};
