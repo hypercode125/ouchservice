@@ -44,10 +44,16 @@ jobs:
             echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-16 main" \
               | sudo tee /etc/apt/sources.list.d/llvm.list
             sudo apt-get update
+            # ASan/UBSan runtime libs ship in a separate package; required
+            # for the Debug + sanitizers lane to link.
+            EXTRA_PKGS="libclang-rt-16-dev"
+          else
+            EXTRA_PKGS=""
           fi
           sudo apt-get install -y --no-install-recommends \
             cmake ninja-build \
             ${{ matrix.cc }} ${{ matrix.cxx }} \
+            ${EXTRA_PKGS} \
             libssl-dev pkg-config
 
       - name: Configure
@@ -99,10 +105,16 @@ jobs:
             echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-16 main" \
               | sudo tee /etc/apt/sources.list.d/llvm.list
             sudo apt-get update
+            # ASan/UBSan runtime libs ship in a separate package; required
+            # for the Debug + sanitizers lane to link.
+            EXTRA_PKGS="libclang-rt-16-dev"
+          else
+            EXTRA_PKGS=""
           fi
           sudo apt-get install -y --no-install-recommends \
             cmake ninja-build \
             ${{ matrix.cc }} ${{ matrix.cxx }} \
+            ${EXTRA_PKGS} \
             libssl-dev pkg-config
       - name: Configure FIX-enabled Release
         run: |

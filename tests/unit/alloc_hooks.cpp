@@ -33,6 +33,23 @@ void* operator new[](std::size_t n) {
   return p;
 }
 
+// nothrow variants — without these, the system uses an unhooked path and
+// ASan reports a spurious alloc-dealloc-mismatch when our `operator delete`
+// frees the pointer (free vs operator-new(nothrow)).
+void* operator new(std::size_t n, const std::nothrow_t&) noexcept {
+  if (bist::alloc_internal::tracking_active) {
+    ++bist::alloc_internal::allocations_count;
+  }
+  return std::malloc(n == 0 ? 1 : n);
+}
+
+void* operator new[](std::size_t n, const std::nothrow_t&) noexcept {
+  if (bist::alloc_internal::tracking_active) {
+    ++bist::alloc_internal::allocations_count;
+  }
+  return std::malloc(n == 0 ? 1 : n);
+}
+
 void operator delete(void* p) noexcept {
   if (bist::alloc_internal::tracking_active && p) {
     ++bist::alloc_internal::deallocations_count;
@@ -55,6 +72,20 @@ void operator delete(void* p, std::size_t) noexcept {
 }
 
 void operator delete[](void* p, std::size_t) noexcept {
+  if (bist::alloc_internal::tracking_active && p) {
+    ++bist::alloc_internal::deallocations_count;
+  }
+  std::free(p);
+}
+
+void operator delete(void* p, const std::nothrow_t&) noexcept {
+  if (bist::alloc_internal::tracking_active && p) {
+    ++bist::alloc_internal::deallocations_count;
+  }
+  std::free(p);
+}
+
+void operator delete[](void* p, const std::nothrow_t&) noexcept {
   if (bist::alloc_internal::tracking_active && p) {
     ++bist::alloc_internal::deallocations_count;
   }
